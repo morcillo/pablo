@@ -5,7 +5,11 @@
  * @version 1.0
  */
 
+#ifndef _MATRIX_H__
+ #define #ifndef _MATRIX_H__
+
 #include <stdint.h>
+#include <pthread>
 
 /**
  * @def MATRIX_LINES
@@ -20,4 +24,11 @@ typedef struct {
 	uint32_t matrix1[MATRIX_ROWS][MATRIX_LINES];
 	uint32_t matrix2[MATRIX_ROWS][MATRIX_LINES];
 	uint32_t result[MATRIX_ROWS][MATRIX_LINES];
+	uint32_t rowXline;
+	pthread_mutex_t mutex;
 } matrix_t;
+
+// Function prototypes
+void *matrix_MultRowCol(void *arg);
+
+#endif
