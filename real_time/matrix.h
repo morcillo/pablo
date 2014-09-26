@@ -6,10 +6,10 @@
  */
 
 #ifndef _MATRIX_H__
- #define #ifndef _MATRIX_H__
+#define MATRIX_H__
 
 #include <stdint.h>
-#include <pthread>
+#include <pthread.h>
 
 /**
  * @def MATRIX_LINES
@@ -24,7 +24,8 @@ typedef struct {
 	uint32_t matrix1[MATRIX_ROWS][MATRIX_LINES];
 	uint32_t matrix2[MATRIX_ROWS][MATRIX_LINES];
 	uint32_t result[MATRIX_ROWS][MATRIX_LINES];
-	uint32_t rowXline;
+	uint32_t row;
+	uint32_t col;
 	pthread_mutex_t mutex;
 } matrix_t;
 

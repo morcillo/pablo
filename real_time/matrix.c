@@ -26,11 +26,15 @@
 // Include files sector
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdbool.h>
+#include <string.h>
+#include <stdlib.h>
 #include "matrix.h"
 
-pthread_mutex_t mutex;
+pthread_mutex_t *mutex;
 /*TODO: Change the maximum array size*/
-pthread_t threads[MATRIX_ROWS];
+pthread_t threads[MATRIX_ROWS * MATRIX_LINES];
 
 
 //Local functions
@@ -49,38 +53,64 @@ static uint8_t CheckMatrixSizes(uint32_t col1, uint32_t row2){
 
 // Main function
 int main(void) {
-	uint32_t i;
+	uint32_t i, j;
 	/*For initial tests matrixes have standard size and values. 
 	TODO: implement a method that allows the user to create a matrix in whatever way 
 	he/se deems fit for the problem*/
-	uint32_t matA[MATRIX_ROWS][MATRIX_ROWS] = {10, 10, 10; 10, 10, 10; 10, 10, 10}
-	uint32_t matB[MATRIX_ROWS][MATRIX_ROWS] = {11, 12, 13; 14, 15, 16; 17, 18, 19}
+	uint32_t matA[MATRIX_ROWS][MATRIX_ROWS] = 
+    {
+        {1, 2, 3},
+        {4, 5, 6},
+        {7, 8, 9}
+    };
 
-	matrix_t matrix = 
-	{
-		.matrix1 = matA,
-		.matrix2 = matB,
-		.mutex = &mutex,
-		.rowXline = 0 
-	}
+	uint32_t matB[MATRIX_ROWS][MATRIX_ROWS] = 
+    {
+        {11, 12, 13},
+        {14, 15, 16},
+        {17, 18, 19}
+    };
+
+	matrix_t matrix;
+	memcpy(&matrix.matrix1, &matA, MATRIX_ROWS * MATRIX_LINES * sizeof(uint32_t));
+    memcpy(&matrix.matrix2, &matB, MATRIX_ROWS * MATRIX_LINES * sizeof(uint32_t));
+    matrix.row = 0;
+	matrix.col = 0;
 	/*Since the most inner numbers that describe the matrix's size must be equal, the
 	constant MATRIX_LINES is used. This is possible momentarilly because the initial tests
 	are being done on sqaure matrixes.*/
 	uint32_t numOfThreads = MATRIX_LINES;
 
-	if(CheckMatrixSizes(MATRIX_LINES, MATRIX_ROWS) == FALSE){
+    mutex = (pthread_mutex_t *)malloc(sizeof(*mutex));
+
+    pthread_mutex_init(mutex, NULL);
+
+	if(!CheckMatrixSizes(MATRIX_LINES, MATRIX_ROWS)){
 		goto error;
 	}
 
-
+	printf("numofthreads %d\n\n", numOfThreads);
 	for(i = 0; i < numOfThreads; i++){
-		pthread_create(&threads[i], NULL, matrix_MultRowCol, NULL, (void *)matrix);
-		pthread_join(threads[i], NULL);
-		matrix.rowXline++;
+		for(j = 0; j < numOfThreads; j++){
+			printf("task %d ", i+1);
+			pthread_create(&threads[i+j], NULL, matrix_MultRowCol, (void *)&matrix);
+			pthread_join(threads[i+j], NULL);
+			matrix.col++;
+			matrix.col %= MATRIX_LINES;
+		}
+		matrix.row++;
 	}
 
+    for(i = 0; i < MATRIX_LINES; i++) {
+		printf("%d ", matrix.result[0][i]);
+    }
+
+    printf ("\n");
+
+    goto end;
+
 error:
-	printf("Function may not be implemented due to errors in the desired matrix\n")
+	printf("Function may not be implemented due to errors in the desired matrix\n");
 
 end:
 	printf("Exiting the function\n");
@@ -97,18 +127,25 @@ end:
 void *matrix_MultRowCol(void *arg){
 	uint32_t i, j;
 	uint32_t temp = 0;
-	matrix_t *matrix = (matrix_t *)arg;
-	/*Separates the contents of arg into manageable parts*/
-	uint32_t row = matrix->rowXline;
-	uint32_t matrixA[MATRIX_ROWS][MATRIX_LINES] = matrix->matrix1;
-	uint32_t matrixB[MATRIX_ROWS][MATRIX_LINES] = matrix->matrix2;
+    matrix_t *matrix = (matrix_t *)arg;
+    /*Separates the contents of arg into manageable parts*/
+    uint32_t row = matrix->row;
+	uint32_t col = matrix->col;
+    uint32_t matrixA[MATRIX_ROWS][MATRIX_LINES]; //= matrix->matrix1;
+    uint32_t matrixB[MATRIX_ROWS][MATRIX_LINES]; // = matrix->matrix2;
 
-	pthread_mutex_lock(matrix->mutex);
-	for(i = 0; i < row; i++) {
-		for(j = 0; j < row; j++) {
-			temp = matrixA[i][j] * matrixB[j][i];
-		}
+    memcpy(&matrixA, &matrix->matrix1, MATRIX_ROWS * MATRIX_LINES * sizeof(uint32_t));
+    memcpy(&matrixB, &matrix->matrix2, MATRIX_ROWS * MATRIX_LINES * sizeof(uint32_t));
+
+	pthread_mutex_lock(mutex);
+
+	for(j = 0; j < MATRIX_LINES; j++) {
+		temp += matrixA[row][j] * matrixB[j][col];
+		printf("[%d] [%d] ", matrixA[row][j], matrixB[j][col]);
 	}
-	matrix->result[row][row] = temp
-	pthread_mutex_unlock(matrix-?>mutex);
+	
+    printf("\ntemp %d\n", temp);
+	matrix->result[row][col] = temp;
+	pthread_mutex_unlock(mutex);
 }
+
