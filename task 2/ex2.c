@@ -26,9 +26,11 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <ncurses.h>
 
 #define NUM_OF_VARIABLES 10
-#define NUM_OF_THREADS (NUM_OF_VARIABLES+NUM_OF_VARIABLES*3+1)
+#define NUM_OF_THREADS 	(NUM_OF_VARIABLES+NUM_OF_VARIABLES*3+1)
+#define NUM_OF_DATAS   	NUM_OF_THREADS
 
 typedef struct {
 	uint32_t min;
@@ -82,7 +84,7 @@ varData_t dataVar7 = {0, 0, 0};
 varData_t dataVar8 = {0, 0, 0};
 varData_t dataVar9 = {0, 0, 0};
 
-#define REGISTER_STRUCT(index) {&mutexvar##index, &variable##index, &storevar##index, &dataVar##index, -1, "var" #index}
+#define REGISTER_STRUCT(index)  {&mutexvar##index, &variable##index, &storevar##index, &dataVar##index, -1, "var" #index "\0"}				
 
 typedef struct {
 	pthread_mutex_t *mutex;
@@ -107,7 +109,8 @@ system_t sys[NUM_OF_THREADS] =
 	REGISTER_STRUCT(6),
 	REGISTER_STRUCT(7),
 	REGISTER_STRUCT(8),
-	REGISTER_STRUCT(9)
+	REGISTER_STRUCT(9), 
+	{NULL, NULL, NULL, NULL, -1, "NULL\0"}
 };
 
 static void UpdateVar(void *var) {
@@ -116,8 +119,8 @@ static void UpdateVar(void *var) {
 	while(1){
 		sleep(1);
 		pthread_mutex_lock(sys->mutex);
-		*sys->variable = rand();
-		sys->store[sys->index++] = *sys->variable;
+		sys->variable = rand();
+		sys->store[sys->index++] = sys->variable;
 		if(sys->index > 99) sys->index = 0;
 		pthread_mutex_unlock(sys->mutex);
 	}
@@ -126,7 +129,7 @@ static void UpdateVar(void *var) {
 static void Minimum(void *var){
 	system_t *sys = (system_t *)var;
 	uint32_t i;
-	uint32_t min;
+	uint32_t min = 0;
 	bool firstTime = true;
 	uint32_t index = sys->index;
 	while(1) {
@@ -138,7 +141,7 @@ static void Minimum(void *var){
 					min = sys->store[i];
 					firstTime = false;
 				} else {
-					if(sys->store[i] < min) {
+					if(min > sys->store[i]) {
 						min = sys->store[i];
 						sys->data->min = min;
 					}
@@ -164,7 +167,7 @@ static void Maximum(void *var){
 					max = sys->store[i];
 					firstTime = false;
 				} else {
-					if(sys->store[i] > max) {
+					if(sys->store[i] < max) {
 						max = sys->store[i];
 						sys->data->max = max;
 					}
@@ -190,35 +193,58 @@ static void Average(void *var){
 			}
 			avg = sum/(index+1);
 			sys->data->avg = avg;
+
 			pthread_mutex_unlock(sys->mutex);
 		}		
 	}
 }
 
+#define PRINT_SUPERVISORY(var)	printw("Variable: %s \t Min: %d \t Avg: %d \t Max: %d \n", var.name, var.data->min, var.data->avg, var.data->max)
+
 static void Supervisory(void *var) {
 	system_t *sys = (system_t *)var;
+	uint8_t i, j;
+	initscr();
 	while(1){
-		sleep(5);
-		pthread_mutex_lock(sys->mutex);
-
+		sleep(2);
+		for(i = 0; i < NUM_OF_VARIABLES; i++) {
+			pthread_mutex_lock(sys[i].mutex);	
+		}
+		clear();
+		printw("Supervisory\n");
+		for(i = 0; i < NUM_OF_VARIABLES; i ++) {
+				printw("Variable %s, min %d,  avg %d, max %d\n", sys->name, sys[i].data->min, sys[i].data->avg, sys[i].data->max);
+		}
+		printww("\n");
+		for (i = 0 ; i < 0; i++) {
+			for (j = 0; j < 100; j++){
+				printw("store %d   %d \n", j, sys[i].store[j]);
+			}
+		}
+		refresh();
+		for(i = 0; i < NUM_OF_VARIABLES; i++) {
+			pthread_mutex_unlock(sys[i].mutex);	
+		}
 	}
 }
 
 int main(void) {
-	uint32_t i, j;
+	uint32_t i;
 
 	for(i = 0; i < NUM_OF_VARIABLES; i++) {
 		pthread_create(&threads[4*i], NULL, UpdateVar, (void *)&sys[i]);
-		pthread_join(threads[4*i], NULL);
-
-		for(j = 0; j < 3; j++){
-			pthread_create(&threads[i+j+1], NULL, Minimum, (void *)&sys[i]);
-			pthread_join(threads[i+j+1], NULL);
-		}
+		pthread_create(&threads[i*4+1], NULL, Minimum, (void *)&sys[i]);
+		pthread_create(&threads[i*4+2], NULL, Maximum, (void *)&sys[i]);
+		pthread_create(&threads[i*4+3], NULL, Average, (void *)&sys[i]);
 	}
 
-	pthread_create(&threads[NUM_OF_THREADS-1], NULL, Supervisory, (void *)&system);
+	pthread_create(&threads[NUM_OF_THREADS-1], NULL, Supervisory, (void *)&sys);
+
+	pthread_join(threads[i+1], NULL);
+	pthread_join(threads[4*i], NULL);
+	pthread_join(threads[i+2], NULL);
     pthread_join(threads[NUM_OF_THREADS-1], NULL);
+	pthread_join(threads[i+3], NULL);
 
     return 0;
 
