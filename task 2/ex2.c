@@ -28,16 +28,36 @@
 #include <stdlib.h>
 #include <ncurses.h>
 
-#define NUM_OF_VARIABLES 10
-#define NUM_OF_THREADS 	(NUM_OF_VARIABLES+NUM_OF_VARIABLES*3+1)
-#define NUM_OF_DATAS   	NUM_OF_THREADS
+/**
+ * @brief Macro to initiate a struct easily
+ * @param  index - Index of the variable
+ */
+#define REGISTER_STRUCT(index)  {&mutexvar##index, &variable##index, &storevar##index, &dataVar##index, -1, "var" #index "\0"}				
 
+#define NUM_OF_VARIABLES 10
+/**
+ * All variables in the system must have at least 4 operations:
+ * 		- Minimum;
+ * 		- Maximum;
+ * 		- Average;
+ * 		- Update;
+ * There is another thread special for the supervisory
+ */
+#define NUM_OF_THREADS 	(NUM_OF_VARIABLES+NUM_OF_VARIABLES*3+1)
+
+/**
+ * @typedef varData_t
+ * @brief Structure to store the relevant data of the variable
+ */
 typedef struct {
 	uint32_t min;
 	uint32_t avg;
 	uint32_t max;
 } varData_t;
 
+//*****************************************************************************************
+//                        CREATION OF VARIABLES
+//*****************************************************************************************
 uint32_t variable0;
 uint32_t variable1;
 uint32_t variable2;
@@ -48,7 +68,9 @@ uint32_t variable6;
 uint32_t variable7;
 uint32_t variable8;
 uint32_t variable9;
-
+//*****************************************************************************************
+//                        CREATION OF STORAGE IN MEMORY FOR VARIABLES
+//*****************************************************************************************
 uint32_t storevar0[100];
 uint32_t storevar1[100];
 uint32_t storevar2[100];
@@ -59,7 +81,9 @@ uint32_t storevar6[100];
 uint32_t storevar7[100];
 uint32_t storevar8[100];
 uint32_t storevar9[100];
-
+//*****************************************************************************************
+//                        CREATION OF MUTEXES FOR VARIABLES
+//*****************************************************************************************
 pthread_mutex_t mutexvar0;
 pthread_mutex_t mutexvar1;
 pthread_mutex_t mutexvar2;
@@ -70,9 +94,13 @@ pthread_mutex_t mutexvar6;
 pthread_mutex_t mutexvar7;
 pthread_mutex_t mutexvar8;
 pthread_mutex_t mutexvar9;
-
+//*****************************************************************************************
+//                        CREATION OF THREADS
+//*****************************************************************************************
 pthread_t threads[NUM_OF_THREADS];
-
+//*****************************************************************************************
+//                        CREATION OF DATA VARIABLES
+//*****************************************************************************************
 varData_t dataVar0 = {0, 0, 0};
 varData_t dataVar1 = {0, 0, 0};
 varData_t dataVar2 = {0, 0, 0};
@@ -83,9 +111,12 @@ varData_t dataVar6 = {0, 0, 0};
 varData_t dataVar7 = {0, 0, 0};
 varData_t dataVar8 = {0, 0, 0};
 varData_t dataVar9 = {0, 0, 0};
-
-#define REGISTER_STRUCT(index)  {&mutexvar##index, &variable##index, &storevar##index, &dataVar##index, -1, "var" #index "\0"}				
-
+/**
+ * @typedef system_t
+ * @brief Type that will be passed to the thread. Each variable shall have its own structure.
+ * Finally, an array containing all these structures shall be passed to the supervisory thread
+ * so that it can update all variables for the screen.
+ */
 typedef struct {
 	pthread_mutex_t *mutex;
 	uint32_t *variable;
@@ -111,7 +142,16 @@ system_t sys[NUM_OF_THREADS] =
 	REGISTER_STRUCT(8),
 	REGISTER_STRUCT(9), 
 };
-
+/**
+ * @brief Updates the variable
+ * @details 
+ * 		- Generates a random number;
+ * 		- Stores it in memory in the store array;
+ * 		- Increments index;
+ * 		- if index if bigger than array size, convert index to 0;
+ * 
+ * @param var Thread Structure
+ */
 static void UpdateVar(void *var) {
 	system_t *sys = (system_t *)var;
 	sys->index = 0;
@@ -124,7 +164,16 @@ static void UpdateVar(void *var) {
 		pthread_mutex_unlock(sys->mutex);
 	}
 }
-
+/**
+ * @brief Finds the minimum and stores it
+ * @details 
+ * 		- If it's the first time, grab the first in index, so that it has data to compare;
+ * 		- Run through array;
+ * 		- If value in array is smaller than the auxiliary variable min, assign new value to min and store it in the variable's statistic data minimum.
+ * 
+ * 
+ * @param var Thread structure
+ */
 static void Minimum(void *var){
 	system_t *sys = (system_t *)var;
 	uint32_t i;
@@ -150,7 +199,16 @@ static void Minimum(void *var){
 		}
 	}
 }
-
+/**
+ * @brief Finds the maximum and stores it
+ * @details 
+ * 		- If it's the first time, grab the first in index, so that it has data to compare;
+ * 		- Run through array;
+ * 		- If value in array is grater than the auxiliary variable max, assign new value to max and store it in the variable's statistic data maximum.
+ * 
+ * 
+ * @param var Thread structure
+ */
 static void Maximum(void *var){
 	system_t *sys = (system_t *)var;
 	uint32_t i;
@@ -176,7 +234,15 @@ static void Maximum(void *var){
 		}
 	}
 }
-
+/**
+ * @brief Calculates average
+ * @details 
+ * 		- Run through stored data;
+ * 		- Sum all data;
+ * 		- Divide it by the number of data in it
+ * 
+ * @param var Thread Structure
+ */
 static void Average(void *var){
 	system_t *sys = (system_t *)var;
 	uint32_t i;
@@ -186,7 +252,12 @@ static void Average(void *var){
 	while(1){
 		if(sys->index != index && sys->index != -1) {
 			pthread_mutex_lock(sys->mutex);
-			index = sys->index;
+			if(sys->index != 99) {
+				index = sys->index;
+			} else {
+				index = 99;
+			}
+			
 			for(i = 0; i < index; i++) {
 				sum += sys->store[i];
 			}
@@ -198,8 +269,15 @@ static void Average(void *var){
 	}
 }
 
-#define PRINT_SUPERVISORY(var)	printw("Variable: %s \t Min: %d \t Avg: %d \t Max: %d \n", var.name, var.data->min, var.data->avg, var.data->max)
-
+/**
+ * @brief Supervisory thread
+ * @details 
+ * 		- Lock mutexes;
+ * 		- Print data using ncurses;
+ * 
+ * 
+ * @param var Thread Structure
+ */
 static void Supervisory(void *var) {
 	system_t *sys = (system_t *)var;
 	uint8_t i, j;
@@ -226,7 +304,11 @@ static void Supervisory(void *var) {
 		}
 	}
 }
-
+/**
+ * @brief Main function
+ * @details Creates threads
+ * @return 0 - Application finished
+ */
 int main(void) {
 	uint32_t i;
 
