@@ -167,7 +167,7 @@ static void Maximum(void *var){
 					max = sys->store[i];
 					firstTime = false;
 				} else {
-					if(sys->store[i] < max) {
+					if(sys->store[i] > max) {
 						max = sys->store[i];
 						sys->data->max = max;
 					}
@@ -215,7 +215,7 @@ static void Supervisory(void *var) {
 		for(i = 0; i < NUM_OF_VARIABLES; i ++) {
 				printw("Variable %s, min %d,  avg %d, max %d\n", sys->name, sys[i].data->min, sys[i].data->avg, sys[i].data->max);
 		}
-		printww("\n");
+		printw("\n");
 		for (i = 0 ; i < 0; i++) {
 			for (j = 0; j < 100; j++){
 				printw("store %d   %d \n", j, sys[i].store[j]);
