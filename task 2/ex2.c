@@ -213,7 +213,8 @@ static void Supervisory(void *var) {
 		clear();
 		printw("Supervisory\n");
 		for(i = 0; i < NUM_OF_VARIABLES; i ++) {
-				printw("Variable %s, min %d,  avg %d, max %d\n", sys->name, sys[i].data->min, sys[i].data->avg, sys[i].data->max);
+				printw("Variable %c", &sys[i].name);
+				printw(", min %d,  avg %d, max %d\n", sys[i].data->min, sys[i].data->avg, sys[i].data->max);
 		}
 		printw("\n");
 		for (i = 0 ; i < 0; i++) {
