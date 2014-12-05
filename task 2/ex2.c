@@ -92,7 +92,7 @@ typedef struct {
 	uint32_t *store;
 	varData_t *data;
 	int32_t index;
-	char name[4];
+	char name[5];
 } system_t;
 
 /**
@@ -110,14 +110,13 @@ system_t sys[NUM_OF_THREADS] =
 	REGISTER_STRUCT(7),
 	REGISTER_STRUCT(8),
 	REGISTER_STRUCT(9), 
-	{NULL, NULL, NULL, NULL, -1, "NULL\0"}
 };
 
 static void UpdateVar(void *var) {
 	system_t *sys = (system_t *)var;
 	sys->index = 0;
 	while(1){
-		sleep(1);
+	//	sleep(1);
 		pthread_mutex_lock(sys->mutex);
 		sys->variable = rand();
 		sys->store[sys->index++] = sys->variable;
@@ -138,7 +137,7 @@ static void Minimum(void *var){
 			index = sys->index;
 			for(i = 0; i < index; i++) {
 				if(firstTime) {
-					min = sys->store[i];
+					min = sys->store[0];
 					firstTime = false;
 				} else {
 					if(min > sys->store[i]) {
@@ -164,7 +163,7 @@ static void Maximum(void *var){
 			index = sys->index;
 			for(i = 0; i < index; i++) {
 				if(firstTime) {
-					max = sys->store[i];
+					max = sys->store[0];
 					firstTime = false;
 				} else {
 					if(sys->store[i] > max) {
@@ -213,8 +212,7 @@ static void Supervisory(void *var) {
 		clear();
 		printw("Supervisory\n");
 		for(i = 0; i < NUM_OF_VARIABLES; i ++) {
-				printw("Variable %c", &sys[i].name);
-				printw(", min %d,  avg %d, max %d\n", sys[i].data->min, sys[i].data->avg, sys[i].data->max);
+				printw("Variable %s, min %d,  avg %d, max %d\n",sys[i].name, sys[i].data->min, sys[i].data->avg, sys[i].data->max);
 		}
 		printw("\n");
 		for (i = 0 ; i < 0; i++) {
